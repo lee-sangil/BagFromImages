@@ -1,4 +1,5 @@
 #include<iostream>
+#include<sstream>
 #include<ros/ros.h>
 #include<rosbag/bag.h>
 #include<rosbag/view.h>
@@ -17,51 +18,69 @@ using namespace std;
 
 int main(int argc, char **argv)
 {
-    ros::init(argc, argv, "BagFromImages");
+	ros::init(argc, argv, "BagFromImages");
 
-    if(argc!=5)
-    {
-        cerr << "Usage: rosrun BagFromImages BagFromImages <path to image directory> <image extension .ext> <frequency> <path to output bag>" << endl;
-        return 0;
-    }
+	if(argc!=5)
+	{
+		cerr << "Usage: rosrun BagFromImages BagFromImages <path to image directory> <image extension .ext> <frequency> <path to output bag>" << endl;
+		return 0;
+	}
 
-    ros::start();
+	ros::start();
 
-    // Vector of paths to image
-    vector<string> filenames =
-            DUtils::FileFunctions::Dir(argv[1], argv[2], true);
+	// Vector of paths to image
+	vector<string> filenames =
+		DUtils::FileFunctions::Dir(argv[1], argv[2], true);
 
-    cout << "Images: " << filenames.size() << endl;
+	cout << "Images: " << filenames.size() << endl;
 
-    // Frequency
-    double freq = atof(argv[3]);
+	// Frequency
+//	double freq = atof(argv[3]);
 
-    // Output bag
-    rosbag::Bag bag_out(argv[4],rosbag::bagmode::Write);
+	// Output bag
+	rosbag::Bag bag_out(argv[4],rosbag::bagmode::Write);
 
-    ros::Time t = ros::Time::now();
+	ros::Time t = ros::Time::now();
 
-    const float T=1.0f/freq;
-    ros::Duration d(T);
+//	const float T=1.0f/freq;
+//	ros::Duration d(T);
 
-    for(size_t i=0;i<filenames.size();i++)
-    {
-        if(!ros::ok())
-            break;
+	for(size_t i=0;i<filenames.size();i++)
+	{
+		if(!ros::ok())
+			break;
 
-        cv::Mat im = cv::imread(filenames[i],CV_LOAD_IMAGE_COLOR);
-        cv_bridge::CvImage cvImage;
-        cvImage.image = im;
-        cvImage.encoding = sensor_msgs::image_encodings::RGB8;
-        cvImage.header.stamp = t;
-        bag_out.write("/camera/image_raw",ros::Time(t),cvImage.toImageMsg());
-        t+=d;
-        cout << i << " / " << filenames.size() << endl;
-    }
+		cv::Mat im = cv::imread(filenames[i],CV_LOAD_IMAGE_COLOR);
 
-    bag_out.close();
+		vector<char*> tokens;
+		char* token = strtok((char*)filenames[i].c_str(), "/.");
+		while( token != NULL )
+		{
+			tokens.push_back(token);
+			token = strtok(NULL, "/.");
+		}
 
-    ros::shutdown();
+		tokens.pop_back();
+		string usec = string(tokens.back());
+		tokens.pop_back();
+		string sec = string(tokens.back());
+		string ctime = sec+'.'+usec;
+		double time = atof(ctime.c_str());
 
-    return 0;
+		ros::Time t = ros::Time(time);
+
+		cv_bridge::CvImage cvImage;
+		cvImage.image = im;
+		cvImage.encoding = sensor_msgs::image_encodings::RGB8;
+		cvImage.header.stamp = t;
+		bag_out.write("/camera/image_raw",ros::Time(t),cvImage.toImageMsg());
+//		t+=d;
+		cout << i << " / " << filenames.size() << endl;
+	}
+
+	bag_out.close();
+
+	ros::shutdown();
+
+	return 0;
 }
